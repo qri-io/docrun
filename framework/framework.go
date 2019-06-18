@@ -50,7 +50,12 @@ func (f *DocRunner) HandleNode(node ast.Node) (*DocrunFixture, *DocrunSource, er
 			text := strings.Trim(string(leaf.Literal), " \n")
 			if strings.HasPrefix(text, "<!--") && strings.HasSuffix(text, "-->") {
 				text = text[4 : len(text)-3]
-				// TODO(dlong): Only continue if the comment block begins with the text "docrun".
+				text = strings.TrimSpace(text)
+
+				// Only run over comment blocks that start with the string "docrun".
+				if !strings.HasPrefix(text, "docrun") {
+					return nil, nil, nil
+				}
 
 				var fields map[string]interface{}
 				err := yaml.Unmarshal([]byte(text), &fields)
@@ -188,6 +193,11 @@ func (f *DocRunner) DisplayResults() {
 		fmt.Printf("PASS: %d tests (%d trivial)\n", f.Results.countSuccess, f.Results.countTrivial)
 	}
 	fmt.Printf("FAIL: %d\n", f.Count-f.Results.countSuccess)
+}
+
+// GetResults returns number of tests, number of successes, and number of trivial successes.
+func (f *DocRunner) GetResults() (int, int, int) {
+	return f.Count, f.Results.countSuccess, f.Results.countTrivial
 }
 
 // DispatchTestCase dispatches a test case.

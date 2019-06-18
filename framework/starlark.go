@@ -8,9 +8,9 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	"github.com/qri-io/dataset"
+	stards "github.com/qri-io/qri/startf/ds"
 	starutil "github.com/qri-io/starlib/util"
 	"github.com/qri-io/startf/context"
-	stards "github.com/qri-io/startf/ds"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
 )
@@ -152,12 +152,15 @@ func (r *StarlarkRunner) Run(details *testDetails, sourceCode string) error {
 		return fmt.Errorf("parsing \"%s\": %s", resultStr, err.Error())
 	}
 
+	actualString := fmt.Sprintf("%s", actual)
+	expectString := fmt.Sprintf("%s", details.Expect)
+
 	// Compare actual results against the expected results, fail if different.
-	if !reflect.DeepEqual(actual, details.Expect) {
+	if !reflect.DeepEqual(actualString, expectString) {
 		tmpl := `test case failure
-actual: %s
-expect: %s`
-		return fmt.Errorf(tmpl, actual, details.Expect)
+  actual: %s
+  expect: %s`
+		return fmt.Errorf(tmpl, actualString, expectString)
 	}
 
 	log.Info("success!")
