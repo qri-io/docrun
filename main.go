@@ -8,26 +8,47 @@ import (
 	"os"
 )
 
-// TODO(dlong): This first implementation is being used to act as a prototype in order to
-// finalize the design of docrun. In the near future, add tests and documentation.
+func displayOptions() {
+	fmt.Printf("options:\n")
+	fmt.Printf("   --v    verbose logging\n")
+	fmt.Printf("   --vv   very verbose logging\n")
+	fmt.Printf("\n")
+}
+
+func displayCommands() {
+	fmt.Printf("commands:\n")
+	fmt.Printf("   run [filename]   execute docrun on one file\n")
+	fmt.Printf("\n")
+}
 
 func main() {
 	verbosePtr := flag.Bool("v", false, "verbose logging to show more info")
 	veryVerbosePtr := flag.Bool("vv", false, "very verbose logging to show debug info")
 	flag.Parse()
 
-	if len(flag.Args()) == 0 {
-		fmt.Printf("Usage: docrun [options] filename\n")
+	if len(flag.Args()) < 2 {
+		fmt.Printf("Usage: docrun [command] [options]\n")
+		fmt.Printf("\n")
+		displayOptions()
+		displayCommands()
 		os.Exit(1)
 	}
 
-	filename := flag.Args()[0]
+	command := flag.Args()[0]
+	filename := flag.Args()[1]
 	logLevel := 0
 	if *verbosePtr {
 		logLevel = 1
 	}
 	if *veryVerbosePtr {
 		logLevel = 2
+	}
+
+	if command != "run" {
+		fmt.Printf("Error, unknown command \"%s\"\n", command)
+		fmt.Printf("\n")
+		displayCommands()
+		os.Exit(1)
 	}
 
 	docAnalyze(filename, logLevel)
