@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"strings"
 
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/ast"
@@ -42,11 +41,10 @@ func docAnalyze(path string, logLevel int) {
 	}
 	renderer := html.NewRenderer(opts)
 	md, err := ioutil.ReadFile(path)
-	if err != nil {
-		if strings.Contains(err.Error(), "no such file or directory") {
-			fmt.Printf("File not found: \"%s\"\n", path)
-			os.Exit(1)
-		}
+	if os.IsNotExist(err) {
+		fmt.Printf("File not found: \"%s\"\n", path)
+		os.Exit(1)
+	} else if err != nil {
 		panic(err)
 	}
 	// Parse markdown to collect and run test cases.
