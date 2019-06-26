@@ -12,6 +12,8 @@ type docrunDetails struct {
 	Pass    bool
 	Test    *testDetails
 	Command *commandDetails
+	// Type of data structure to fill
+	Filltype string
 	// These two fields are entirely optional
 	Lang string
 	Save *saveDetails

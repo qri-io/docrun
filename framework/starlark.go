@@ -3,14 +3,22 @@ package framework
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 
 	golog "github.com/ipfs/go-log"
 	"github.com/qri-io/dataset"
+	"github.com/qri-io/qri/startf/context"
 	stards "github.com/qri-io/qri/startf/ds"
+	starhtml "github.com/qri-io/starlib/html"
+	starhttp "github.com/qri-io/starlib/http"
+	startime "github.com/qri-io/starlib/time"
 	starutil "github.com/qri-io/starlib/util"
-	"github.com/qri-io/startf/context"
+	starxlsx "github.com/qri-io/starlib/xlsx"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
 )
@@ -32,11 +40,25 @@ type ModuleLoader func(thread *starlark.Thread, module string) (starlark.StringD
 // NewMockModuleLoader returns a ModuleLoader to load mock modules
 func NewMockModuleLoader(proxy *proxyDetails) ModuleLoader {
 	return func(thread *starlark.Thread, module string) (dict starlark.StringDict, err error) {
-		m := &MockHTTPModule{proxy: proxy}
-		// TODO(dlong): Add other mock implementations, as needed
-		return starlark.StringDict{
-			"http": m.Struct(),
-		}, nil
+		if module == "http.star" {
+			m := &MockHTTPModule{proxy: proxy}
+			return starlark.StringDict{
+				"http": m.Struct(),
+			}, nil
+		} else if module == "qri.star" {
+			m := &MockQriModule{}
+			return starlark.StringDict{
+				"qri": m.Struct(),
+			}, nil
+		} else if module == "html.star" {
+			return starhtml.LoadModule()
+		} else if module == "time.star" {
+			return startime.LoadModule()
+		} else if module == "xlsx.star" {
+			return starxlsx.LoadModule()
+		} else {
+			return nil, fmt.Errorf("module not defined: \"%s\"", module)
+		}
 	}
 }
 
@@ -65,9 +87,40 @@ func (m *MockHTTPModule) get(thread *starlark.Thread, _ *starlark.Builtin, args 
 		if err != nil {
 			return starlark.None, err
 		}
-		return result, nil
+		// Construct a fake http response.
+		rec := httptest.NewRecorder()
+		rec.WriteString(result.String())
+		res := rec.Result()
+		r := &starhttp.Response{*res}
+		// Attack the request, convert to starlark struct type.
+		r.Request = httptest.NewRequest("GET", m.proxy.URL, nil)
+		return r.Struct(), nil
 	}
 	return starlark.None, fmt.Errorf("Cannot use http.get without WebProxy")
+}
+
+// MockQriModule is a module for mocking out qri functionality.
+type MockQriModule struct {
+}
+
+// Struct returns a starlark struct with methods
+func (m *MockQriModule) Struct() *starlarkstruct.Struct {
+	return starlarkstruct.FromStringDict(starlarkstruct.Default, m.StringDict())
+}
+
+// StringDict returns the module as a dictionary keyed by strings
+func (m *MockQriModule) StringDict() starlark.StringDict {
+	return starlark.StringDict{
+		"list_datasets": starlark.NewBuiltin("list_datasets", m.listDatasets),
+	}
+}
+
+// ListDatasets creates a list of mock datasetrefs
+func (m *MockQriModule) listDatasets(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	ls := &starlark.List{}
+	ls.Append(starlark.String("test/ds_1@QmExample/ipfs/QmExample"))
+	ls.Append(starlark.String("test/ds_2@QmSample/ipfs/QmSample"))
+	return ls, nil
 }
 
 // Run runs the actual starlark code from a test case.
@@ -119,12 +172,22 @@ func (r *StarlarkRunner) Run(details *testDetails, sourceCode string) error {
 		return fmt.Errorf("running code block: %s", err.Error())
 	}
 
+	// Preserve stdout so it can be captured
+	stdoutTempFile := filepath.Join(os.TempDir(), "stdout")
+	captureWrite, _ := os.Create(stdoutTempFile)
+	preserveOut := os.Stdout
+
 	environment["ds"] = ds.Methods()
 	environment["ctx"] = ctx.Struct()
 	// Call is the entry point to run in order to exercise the test case.
 	// TODO(dlong): Validate that this is a single function
 	log.Info("running Call...")
+	// Capture stdout when the main part is executed
+	// TODO: `print` statement in starlark is writing to stderr, not stdout. Fix this, please.
+	os.Stderr = captureWrite
 	environment, err = starlark.ExecFile(thread, "", "result = "+details.Call, environment)
+	captureWrite.Close()
+	os.Stderr = preserveOut
 	if err != nil {
 		return fmt.Errorf("during Call: %s", err.Error())
 	}
@@ -134,22 +197,27 @@ func (r *StarlarkRunner) Run(details *testDetails, sourceCode string) error {
 		ctx.SetResult("download", environment["result"])
 	}
 
-	environment["ds"] = ds.Methods()
-	environment["ctx"] = ctx.Struct()
 	// Actual accesses the results of the test case.
-	// TODO(dlong): Validate that this is an expression (should not have side-effects)
 	log.Info("running Actual...")
-	environment, err = starlark.ExecFile(thread, "", "result = "+details.Actual, environment)
-	if err != nil {
-		return fmt.Errorf("during Actual: %s", err.Error())
-	}
-
-	// Parse the results from Actual into a native data structure.
 	var actual interface{}
-	resultStr := environment["result"].String()
-	err = json.Unmarshal([]byte(resultStr), &actual)
-	if err != nil {
-		return fmt.Errorf("parsing \"%s\": %s", resultStr, err.Error())
+	if details.Actual == "stdout.get()" {
+		// Get what was written to stdout.
+		stdoutText, _ := ioutil.ReadFile(stdoutTempFile)
+		actual = strings.TrimSpace(string(stdoutText))
+	} else {
+		environment["ds"] = ds.Methods()
+		environment["ctx"] = ctx.Struct()
+		// TODO(dlong): Validate that this is an expression (should not have side-effects)
+		environment, err = starlark.ExecFile(thread, "", "result = "+details.Actual, environment)
+		if err != nil {
+			return fmt.Errorf("during Actual: %s", err.Error())
+		}
+		// Parse the results from Actual into a native data structure.
+		resultStr := environment["result"].String()
+		err = json.Unmarshal([]byte(resultStr), &actual)
+		if err != nil {
+			return fmt.Errorf("parsing \"%s\": %s", resultStr, err.Error())
+		}
 	}
 
 	actualString := fmt.Sprintf("%s", actual)
