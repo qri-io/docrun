@@ -18,6 +18,7 @@ type DocRunner struct {
 	Count       int
 	Fixture     *DocrunFixture
 	Source      *DocrunSource
+	CaseError   bool
 	Results     runResults
 	Starlark    *StarlarkRunner
 	CommandLine *CommandLineRunner
@@ -89,6 +90,7 @@ func (f *DocRunner) AddNode(node ast.Node) {
 	fixture, source, err := f.HandleNode(node)
 	if err != nil {
 		f.AddError(err)
+		f.CaseError = true
 		return
 	}
 	if f.Fixture == nil && fixture != nil {
@@ -100,15 +102,25 @@ func (f *DocRunner) AddNode(node ast.Node) {
 		// Once fixture and source are available, run the test case.
 		f.Source = source
 		f.RunFixture()
-		f.Fixture = nil
-		f.Source = nil
+		f.ClearState()
 	}
+}
+
+// ClearState finishes a fixture run by clearing the related state.
+func (f *DocRunner) ClearState() {
+	f.Fixture = nil
+	f.Source = nil
+	f.CaseError = false
 }
 
 // RunFixture runs a fixture by combining metadata and the source code.
 func (f *DocRunner) RunFixture() {
 	f.Count++
 	if f.Fixture == nil {
+		// If this fixture case already encountered an an error, don't throw another.
+		if f.CaseError {
+			return
+		}
 		// Source code blocks should all be immediately preceded by a fixture node. It is an error
 		// to have source code without a fixture node. An easy to silence this is to add:
 		// <!--
@@ -154,6 +166,7 @@ func (f *DocRunner) RunFixture() {
 		return
 	}
 	f.HandleSave(f.Fixture.Docrun.Save, f.Source.Code)
+	f.Results.AddSuccess(f.Count, false)
 }
 
 // HandleSave saves the source code to a file, for future tests and commands.
@@ -176,13 +189,14 @@ func (f *DocRunner) HasError() bool {
 // ShowErrors displays errors to stdout
 func (f *DocRunner) ShowErrors() {
 	for _, err := range f.Errs {
-		fmt.Printf("Error: %s\n", err)
+		fmt.Printf("Error: %s\n\n", err)
 	}
 }
 
 // AddError adds an error
 func (f *DocRunner) AddError(err error) {
-	f.Errs = append(f.Errs, err)
+	// TODO(dlong): Clean up how this interacts with ShowErrors, which prefixes "Error: "
+	f.Errs = append(f.Errs, fmt.Errorf("case %d: %s", f.Count, err))
 }
 
 // DisplayResults displays results from running the test cases.
