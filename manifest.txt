@@ -1,0 +1,5 @@
+github.com/qri-io/dataset
+github.com/qri-io/frontend
+github.com/qri-io/starlib
+github.com/qri-io/qri
+github.com/qri-io/website

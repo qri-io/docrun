@@ -26,13 +26,16 @@ func renderHook(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool
 	return ast.GoToNext, false
 }
 
-func docAnalyze(path string, logLevel int) {
+func setLogLevel(logLevel int) {
 	// Assign log level to the logger.
 	if logLevel == 1 {
 		golog.SetLogLevel("docrun", "info")
 	} else if logLevel == 2 {
 		golog.SetLogLevel("docrun", "debug")
 	}
+}
+
+func createRunResults(path string) {
 	// This library converts markdown to html, with a hook for parsed nodes. We ignore the html
 	// output, and only care about the ast nodes while parsing is happening.
 	opts := html.RendererOptions{
@@ -48,10 +51,20 @@ func docAnalyze(path string, logLevel int) {
 		panic(err)
 	}
 	// Parse markdown to collect and run test cases.
-	runner.Init()
 	_ = markdown.ToHTML([]byte(md), nil, renderer)
+}
+
+func docAnalyze(path string) {
+	runner.Init()
+	createRunResults(path)
 	if runner.HasError() {
 		runner.ShowErrors()
 	}
 	runner.DisplayResults()
+}
+
+func docGetResults(path string) framework.RunResults {
+	runner.Init()
+	createRunResults(path)
+	return runner.GetResults()
 }

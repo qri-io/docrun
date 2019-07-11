@@ -18,6 +18,7 @@ func displayOptions() {
 func displayCommands() {
 	fmt.Printf("commands:\n")
 	fmt.Printf("   run [filename]   execute docrun on one file\n")
+	fmt.Printf("   report           run over all directories in manifest.txt\n")
 	fmt.Printf("\n")
 }
 
@@ -26,7 +27,7 @@ func main() {
 	veryVerbosePtr := flag.Bool("vv", false, "very verbose logging to show debug info")
 	flag.Parse()
 
-	if len(flag.Args()) < 2 {
+	if len(flag.Args()) < 1 {
 		fmt.Printf("Usage: docrun [command] [options]\n")
 		fmt.Printf("\n")
 		displayOptions()
@@ -35,7 +36,6 @@ func main() {
 	}
 
 	command := flag.Args()[0]
-	filename := flag.Args()[1]
 	logLevel := 0
 	if *verbosePtr {
 		logLevel = 1
@@ -44,12 +44,17 @@ func main() {
 		logLevel = 2
 	}
 
-	if command != "run" {
+	setLogLevel(logLevel)
+
+	if command == "run" {
+		filename := flag.Args()[1]
+		docAnalyze(filename)
+	} else if command == "report" {
+		createReport()
+	} else {
 		fmt.Printf("Error, unknown command \"%s\"\n", command)
 		fmt.Printf("\n")
 		displayCommands()
 		os.Exit(1)
 	}
-
-	docAnalyze(filename, logLevel)
 }
