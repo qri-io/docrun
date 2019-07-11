@@ -15,29 +15,47 @@ import (
 // DocRunner maintains state to process nodes, run examples, and collect results
 type DocRunner struct {
 	Errs        []error
-	Count       int
 	Fixture     *DocrunFixture
 	Source      *DocrunSource
 	CaseError   bool
-	Results     runResults
+	Results     RunResults
 	Starlark    *StarlarkRunner
 	CommandLine *CommandLineRunner
 }
 
-type runResults struct {
-	countSuccess int
-	countTrivial int
+// RunResults collects results from a run of docrun
+type RunResults struct {
+	CountTotal   int
+	CountSuccess int
+	CountTrivial int
+	CountMissing int
 }
 
-func (r *runResults) AddSuccess(caseNum int, nonTrivial bool) {
-	r.countSuccess++
+// AddSuccess counts up a successfully ran case
+func (r *RunResults) AddSuccess(caseNum int, nonTrivial bool) {
+	r.CountSuccess++
 	if !nonTrivial {
-		r.countTrivial++
+		r.CountTrivial++
 	}
+}
+
+// AddMissing counts that a case doesn't have a fixture
+func (r *RunResults) AddMissing() {
+	r.CountMissing++
+}
+
+// Empty returns whether there were no tests run at all
+func (r *RunResults) Empty() bool {
+	return r.CountTotal == 0
 }
 
 // Init assigns initial state to the DocRunner
 func (f *DocRunner) Init() {
+	f.Errs = []error{}
+	f.Fixture = nil
+	f.Source = nil
+	f.CaseError = false
+	f.Results = RunResults{}
 	f.Starlark = NewStarlarkRunner()
 	f.CommandLine = NewCommandLineRunner()
 }
@@ -115,7 +133,7 @@ func (f *DocRunner) ClearState() {
 
 // RunFixture runs a fixture by combining metadata and the source code.
 func (f *DocRunner) RunFixture() {
-	f.Count++
+	f.Results.CountTotal++
 	if f.Fixture == nil {
 		// If this fixture case already encountered an an error, don't throw another.
 		if f.CaseError {
@@ -127,12 +145,14 @@ func (f *DocRunner) RunFixture() {
 		// docrun:
 		//   pass: true
 		// -->
-		f.AddError(fmt.Errorf("source code block %d is not preceded by a docrun fixture", f.Count))
+		f.AddError(fmt.Errorf("source code block %d is not preceded by a docrun fixture",
+			f.Results.CountTotal))
+		f.Results.AddMissing()
 		return
 	}
 	if f.Fixture.Docrun.Pass {
 		// A trivially passing test.
-		f.Results.AddSuccess(f.Count, false)
+		f.Results.AddSuccess(f.Results.CountTotal, false)
 		return
 	}
 
@@ -147,7 +167,7 @@ func (f *DocRunner) RunFixture() {
 		lang = f.Fixture.Docrun.Lang
 	}
 	if lang == "" {
-		f.AddError(fmt.Errorf("source code block %d has no language", f.Count))
+		f.AddError(fmt.Errorf("source code block %d has no language", f.Results.CountTotal))
 		return
 	}
 
@@ -166,7 +186,7 @@ func (f *DocRunner) RunFixture() {
 		return
 	}
 	f.HandleSave(f.Fixture.Docrun.Save, f.Source.Code)
-	f.Results.AddSuccess(f.Count, false)
+	f.Results.AddSuccess(f.Results.CountTotal, false)
 }
 
 // HandleSave saves the source code to a file, for future tests and commands.
@@ -196,22 +216,27 @@ func (f *DocRunner) ShowErrors() {
 // AddError adds an error
 func (f *DocRunner) AddError(err error) {
 	// TODO(dlong): Clean up how this interacts with ShowErrors, which prefixes "Error: "
-	f.Errs = append(f.Errs, fmt.Errorf("case %d: %s", f.Count, err))
+	f.Errs = append(f.Errs, fmt.Errorf("case %d: %s", f.Results.CountTotal, err))
 }
 
 // DisplayResults displays results from running the test cases.
 func (f *DocRunner) DisplayResults() {
-	if f.Results.countTrivial == 0 {
-		fmt.Printf("PASS: %d tests\n", f.Results.countSuccess)
+	if f.Results.CountTrivial == 0 {
+		fmt.Printf("PASS: %d tests\n", f.Results.CountSuccess)
 	} else {
-		fmt.Printf("PASS: %d tests (%d trivial)\n", f.Results.countSuccess, f.Results.countTrivial)
+		fmt.Printf("PASS: %d tests (%d trivial)\n", f.Results.CountSuccess, f.Results.CountTrivial)
 	}
-	fmt.Printf("FAIL: %d\n", f.Count-f.Results.countSuccess)
+	failNum := f.Results.CountTotal-f.Results.CountSuccess
+	if f.Results.CountMissing == 0 {
+		fmt.Printf("FAIL: %d\n", failNum)
+	} else {
+		fmt.Printf("FAIL: %d (%d missing)\n", failNum, f.Results.CountMissing)
+	}
 }
 
-// GetResults returns number of tests, number of successes, and number of trivial successes.
-func (f *DocRunner) GetResults() (int, int, int) {
-	return f.Count, f.Results.countSuccess, f.Results.countTrivial
+// GetResults returns the results from a run of docrun
+func (f *DocRunner) GetResults() RunResults {
+	return f.Results
 }
 
 // DispatchTestCase dispatches a test case.
@@ -226,7 +251,7 @@ func (f *DocRunner) DispatchTestCase(test *testDetails, lang, source string) {
 	if err != nil {
 		f.AddError(err)
 	} else {
-		f.Results.AddSuccess(f.Count, true)
+		f.Results.AddSuccess(f.Results.CountTotal, true)
 	}
 }
 
@@ -243,6 +268,6 @@ func (f *DocRunner) DispatchCommandCase(cmd *commandDetails, lang, source string
 	if err != nil {
 		f.AddError(err)
 	} else {
-		f.Results.AddSuccess(f.Count, true)
+		f.Results.AddSuccess(f.Results.CountTotal, true)
 	}
 }

@@ -40,14 +40,17 @@ func TestDocrunner(t *testing.T) {
 		runner.ShowErrors()
 		t.Errorf("Docrunner encountered errors")
 	}
-	total, success, trivial := runner.GetResults()
-	if total != 1 {
-		t.Errorf("Expected 1 total test, got %d", total)
+	res := runner.GetResults()
+	if res.CountTotal != 1 {
+		t.Errorf("Expected 1 total test, got %d", res.CountTotal)
 	}
-	if success != 1 {
-		t.Errorf("Expected 1 successful test, got %d", success)
+	if res.CountSuccess != 1 {
+		t.Errorf("Expected 1 successful test, got %d", res.CountSuccess)
 	}
-	if trivial != 1 {
-		t.Errorf("Expected 1 trivial test, got %d", trivial)
+	if res.CountTrivial != 1 {
+		t.Errorf("Expected 1 trivial test, got %d", res.CountTrivial)
+	}
+	if res.CountMissing != 0 {
+		t.Errorf("Expected 0 missing tests, got %d", res.CountMissing)
 	}
 }
