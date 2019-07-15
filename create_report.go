@@ -3,15 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 // ReportRow is information about running docrun on a single markdown file
 type ReportRow struct {
-	Path string
+	Path           string
 	SuccessOther   int
 	SuccessTrivial int
 	FailureOther   int
@@ -33,7 +33,7 @@ func walkRepository(report *FullReport, repo string) {
 				if !res.Empty() {
 					// If there was a non-empty result, add it to report.
 					row := ReportRow{
-						Path: path[len(rootPath) + 1:],
+						Path:           path[len(rootPath)+1:],
 						SuccessOther:   res.CountSuccess - res.CountTrivial,
 						SuccessTrivial: res.CountTrivial,
 						FailureOther:   res.CountTotal - res.CountSuccess - res.CountMissing,

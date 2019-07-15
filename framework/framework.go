@@ -4,10 +4,12 @@
 package framework
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/gomarkdown/markdown/ast"
+	"github.com/qri-io/dataset"
 	"github.com/qri-io/qri/base/fill"
 	"gopkg.in/yaml.v2"
 )
@@ -171,6 +173,13 @@ func (f *DocRunner) RunFixture() {
 		return
 	}
 
+	// If there's a filltype, parse the text using that type to make sure it is valid.
+	filltype := f.Fixture.Docrun.Filltype
+	if filltype != "" {
+		f.DispatchFilltype(filltype, f.Source.Code)
+		f.HandleSave(f.Fixture.Docrun.Save, f.Source.Code)
+		return
+	}
 	// If there's a test substructure, dispatch it.
 	test := f.Fixture.Docrun.Test
 	if test != nil {
@@ -226,7 +235,7 @@ func (f *DocRunner) DisplayResults() {
 	} else {
 		fmt.Printf("PASS: %d tests (%d trivial)\n", f.Results.CountSuccess, f.Results.CountTrivial)
 	}
-	failNum := f.Results.CountTotal-f.Results.CountSuccess
+	failNum := f.Results.CountTotal - f.Results.CountSuccess
 	if f.Results.CountMissing == 0 {
 		fmt.Printf("FAIL: %d\n", failNum)
 	} else {
@@ -237,6 +246,30 @@ func (f *DocRunner) DisplayResults() {
 // GetResults returns the results from a run of docrun
 func (f *DocRunner) GetResults() RunResults {
 	return f.Results
+}
+
+// DispatchFilltype dispatches a filltype operation.
+func (f *DocRunner) DispatchFilltype(filltype, source string) {
+	var err error
+	var fields map[string]interface{}
+	switch filltype {
+	case "json":
+		err = json.Unmarshal([]byte(source), &fields)
+	case "dataset.Dataset":
+		// TODO(dlong): Support datasets in json format
+		err = yaml.Unmarshal([]byte(source), &fields)
+		if err == nil {
+			ds := dataset.Dataset{}
+			err = fill.Struct(fields, &ds)
+		}
+	default:
+		err = fmt.Errorf("unknown filltype %s", filltype)
+	}
+	if err != nil {
+		f.AddError(err)
+	} else {
+		f.Results.AddSuccess(f.Results.CountTotal, true)
+	}
 }
 
 // DispatchTestCase dispatches a test case.
