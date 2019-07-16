@@ -457,6 +457,7 @@ github.com/qri-io/qfs v0.1.0 h1:XgDhon13qLlwJHI2m0FAc2EhZEcrqMPwizvgfQXHzB8=
 github.com/qri-io/qfs v0.1.0/go.mod h1:vZ5gVAYKaW8bDLh8U8DEr3s/1JyNzQJg1Rg9HYS+VZo=
 github.com/qri-io/qri v0.8.0 h1:4/0x8lK1El3L9J6/Wu3NZmLVVYYeyamZkujzlxugUS8=
 github.com/qri-io/qri v0.8.0/go.mod h1:X4axnQpiaUDHxiWFB3TlvLDkip3vAYtNt4ScsVdxsSg=
+github.com/qri-io/qri v0.8.2 h1:5P1DBfGie30LB7ElUOcPvWIlJnLZEtSBU9+ddnUiaSw=
 github.com/qri-io/registry v0.1.0/go.mod h1:sSsNnCZPmyG3IGOisEzTeIEwzCXunLpFsnKS16DKw/c=
 github.com/qri-io/starlib v0.4.0 h1:jsq4lZuqTVY+rqGuV5T3YZd5BbgqmRMi00QY+crXn8U=
 github.com/qri-io/starlib v0.4.0/go.mod h1:JapoWfwTbokzzGktLGV4671KiMnLDmJYtVJfZHhh2c4=

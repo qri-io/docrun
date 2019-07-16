@@ -200,7 +200,12 @@ func (r *StarlarkRunner) Run(details *testDetails, sourceCode string) error {
 	// Actual accesses the results of the test case.
 	log.Info("running Actual...")
 	var actual interface{}
-	if details.Actual == "stdout.get()" {
+
+	if details.Actual == "" {
+		log.Info("blank Actual, nothing to do")
+		log.Info("success!")
+		return nil
+	} else if details.Actual == "stdout.get()" {
 		// Get what was written to stdout.
 		stdoutText, _ := ioutil.ReadFile(stdoutTempFile)
 		actual = strings.TrimSpace(string(stdoutText))

@@ -54,3 +54,25 @@ func TestDocrunner(t *testing.T) {
 		t.Errorf("Expected 0 missing tests, got %d", res.CountMissing)
 	}
 }
+
+func TestErrorFilltype(t *testing.T) {
+	opts := html.RendererOptions{
+		Flags:          html.CommonFlags,
+		RenderNodeHook: renderHook,
+	}
+	renderer := html.NewRenderer(opts)
+	md, err := ioutil.ReadFile("testdata/error_filltype.md")
+	if err != nil {
+		panic(err)
+	}
+	runner.Init()
+	_ = markdown.ToHTML([]byte(md), nil, renderer)
+	if !runner.HasError() {
+		t.Fatalf("Expected errors, did not encounter any")
+	}
+	err = runner.Errs[0]
+	expect := `case 1: path "bodypathz": not found in destination struct`
+	if err.Error() != expect {
+		t.Errorf("error didn't match, actual: \"%s\", expect: \"%s\"", err.Error(), expect)
+	}
+}
