@@ -196,6 +196,13 @@ func (r *StarlarkRunner) Run(details *testDetails, sourceCode string) error {
 	if strings.HasPrefix(details.Call, "download") {
 		ctx.SetResult("download", environment["result"])
 	}
+	// More of a lint rule: transform should not return anything.
+	if strings.HasPrefix(details.Call, "transform") {
+		transformResult := environment["result"]
+		if transformResult != starlark.None {
+			return fmt.Errorf("transform should not return anything")
+		}
+	}
 
 	// Actual accesses the results of the test case.
 	log.Info("running Actual...")
